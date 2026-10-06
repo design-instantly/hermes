@@ -38,9 +38,13 @@ git fetch upstream && git checkout -b sync/upstream main && git merge upstream/m
 ## Running it
 
 ```bash
+bootstrap.sh --base        # a spare: Hermes + plugins only, no brand or secrets (the app keeps 5 ready)
 bootstrap.sh <input_dir>   # commissioning: agent.json, secrets.env, fire-public.pem
 bootstrap.sh               # update in place, reusing the values kept from commissioning
 ```
+
+The app commissions a brand by claiming a spare and running `bootstrap.sh <input_dir>` on it, which
+skips the install when the spare is on `main`'s current commit.
 
 Run a copy outside the checkout (the DesignInstantly app downloads it to `/tmp`): the update step
 rewrites the checkout. A fresh Sprite takes ~6 minutes (Hermes install); updates take seconds when

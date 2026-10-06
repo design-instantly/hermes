@@ -3,6 +3,10 @@
 # Idempotent: commissioning runs it with inputs; re-running it without inputs updates in place.
 #
 # Usage: bootstrap.sh [input_dir]
+#        bootstrap.sh --base
+#   --base                       a spare: install Hermes and plugins only (no brand, no secrets, no
+#                                gateway). Commissioning later claims it and runs with an input_dir,
+#                                which then takes seconds because the install is already done.
 #   <input_dir>/agent.json       non-secret values for the template placeholders (manifest.json "placeholders")
 #   <input_dir>/secrets.env      KEY=value lines for manifest.json "secrets" (merged into ~/.hermes/.env)
 #   <input_dir>/fire-public.pem  agent-cron's fire-token public key
@@ -18,6 +22,9 @@ DI_HERMES_BRANCH="${DI_HERMES_BRANCH:-main}"
 DI_HERMES_RAW="${DI_HERMES_REPO%.git}"
 DI_HERMES_RAW="https://raw.githubusercontent.com/${DI_HERMES_RAW#https://github.com/}"
 
+ARGS=("$@")
+BASE=0
+if [ "${1:-}" = "--base" ]; then BASE=1; shift; fi
 INPUT_DIR=""
 if [ -n "${1:-}" ]; then INPUT_DIR="$(cd "$1" && pwd)"; fi
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
@@ -68,7 +75,7 @@ if [ "${DI_BOOTSTRAP_REEXEC:-}" != 1 ] && ! cmp -s "$0" "$TEMPLATE_DIR/bootstrap
   cp "$TEMPLATE_DIR/bootstrap.sh" "$next"
   stop_heartbeat
   trap - EXIT
-  exec env DI_BOOTSTRAP_REEXEC=1 DI_BOOTSTRAP_STATUS="$STATUS_FILE" bash "$next" "$@"
+  exec env DI_BOOTSTRAP_REEXEC=1 DI_BOOTSTRAP_STATUS="$STATUS_FILE" bash "$next" "${ARGS[@]}"
 fi
 
 manifest() { python3 -c "import json,sys; d=json.load(open('$TEMPLATE_DIR/manifest.json')); print(eval('d' + sys.argv[1]))" "$1"; }
@@ -81,6 +88,7 @@ if [ -f "$HERMES_HOME/.no-bundled-skills" ]; then
   hermes skills opt-in --sync >/dev/null
 fi
 
+if [ "$BASE" = 0 ]; then
 # ── 3. Inputs: keep the brand's values; merge secrets (.env is agent-owned) ───
 touch "$HERMES_HOME/.env"; chmod 600 "$HERMES_HOME/.env"
 set_env() {  # set_env KEY VALUE
@@ -105,6 +113,7 @@ set_env HERMES_TIMEZONE "$(python3 -c "import json; print(json.load(open('$VALUE
 # (The brand's Hindsight bank is created by the DesignInstantly app before this runs.)
 uv run --quiet --no-project --with pyyaml python3 "$TEMPLATE_DIR/apply.py" "$TEMPLATE_DIR" "$VALUES"
 hermes config set cron.chronos.nas_jwks_url "$(cat "$HERMES_HOME/agent-cron-fire-public.pem")" >/dev/null
+fi
 
 # ── 5. Plugins ────────────────────────────────────────────────────────────────
 # Hindsight comes from the Hermes catalog. Hermes only installs a plugin's Python deps after a
@@ -121,6 +130,17 @@ in_pty() {  # in_pty "<hermes args>" — answers "y" to Hermes' dependency promp
     >>/tmp/hindsight-plugin.log 2>&1 || true
   rm -f "$done_flag"
 }
+# A spare stops here: Hermes and the Hindsight plugin's dependencies are installed; the brand's
+# run enables the plugin once its config exists.
+if [ "$BASE" = 1 ]; then
+  [ -d "$HERMES_HOME/plugins/hindsight" ] || in_pty "plugins install $HINDSIGHT_PLUGIN"
+  [ -d "$HERMES_HOME/plugins/hindsight" ] || { log "hindsight plugin did not install"; tail -20 /tmp/hindsight-plugin.log; exit 1; }
+  sha=$(git -C "$CHECKOUT" rev-parse HEAD)
+  printf '{"version":"%s","branch":"%s","commit":"%s","built_at":"%s"}\n' \
+    "$VERSION" "$DI_HERMES_BRANCH" "$sha" "$(date -u +%FT%TZ)" > "$HERMES_HOME/di-base.json"
+  log "base done: $DI_HERMES_BRANCH@${sha:0:10}"
+  exit 0
+fi
 if ! memory_ready; then
   if [ -d "$HERMES_HOME/plugins/hindsight" ]; then
     in_pty "plugins enable $HINDSIGHT_PLUGIN"
