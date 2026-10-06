@@ -35,3 +35,9 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+
+# DesignInstantly-owned upstream files: never auto-merge. Any upstream change to these stops the
+# sync merge so an engineer reviews it against Otto's version and keeps what is relevant.
+# (Applies to `git merge` only; GitHub's web "Sync fork" ignores it, so sync with git.)
+SOUL.md -merge
+hermes_cli/default_soul.py -merge

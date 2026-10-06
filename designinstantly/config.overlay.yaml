@@ -1,0 +1,47 @@
+# Deep-merged into ~/.hermes/config.yaml by bootstrap.sh. Double-brace placeholders are rendered per agent.
+# Secrets never appear here — they live in ~/.hermes/.env (see manifest.json "secrets").
+
+model:
+  default: "@preset/agent-hermes"      # role → OpenRouter preset; change the model fleet-wide there
+  provider: openrouter
+  base_url: https://openrouter.ai/api/v1
+
+agent:
+  # A social media manager works through DesignInstantly's MCP, memory and skills — not a shell.
+  # No terminal/file/code also means an injected prompt cannot read secrets from disk.
+  disabled_toolsets:
+    - terminal
+    - file
+    - code_execution
+    - browser
+    - computer_use
+    - web
+    - image_gen
+    - tts
+    - vision
+    - delegation
+    - cronjob          # schedules come from the template / DesignInstantly, not the agent
+    - clarify          # runs are headless; there is nobody to answer
+    - connections
+
+memory:
+  provider: hindsight
+  memory_enabled: false          # Hermes' flat-file memory off: one memory, in Hindsight
+  user_profile_enabled: false
+
+mcp_servers:
+  designinstantly:
+    url: "{{DI_APP_URL}}/api/mcp"
+    headers:
+      # The co-worker's own token (in .env), scoped server-side to this brand and read-only tools.
+      Authorization: "Bearer ${DI_MCP_TOKEN}"
+
+cron:
+  provider: designinstantly
+  designinstantly:
+    arm_url: "{{AGENT_CRON_URL}}/v1"
+    agent_id: "{{AGENT_ID}}"
+  chronos:                       # /api/cron/fire verifies agent-cron's ES256 token with these
+    portal_url: "{{AGENT_CRON_URL}}"
+    expected_audience: "agent:{{AGENT_ID}}"
+    # nas_jwks_url (the inline PEM public key) is written by bootstrap.sh from agent-cron-fire-public.pem

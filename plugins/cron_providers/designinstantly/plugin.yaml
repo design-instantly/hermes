@@ -1,0 +1,8 @@
+name: designinstantly
+description: >-
+  DesignInstantly external cron provider. Arms a durable one-shot per job in agent-cron (DBOS)
+  instead of running Hermes' 60s ticker, so an idle Sprite can sleep; agent-cron calls
+  /api/cron/fire with a signed JWT at fire time. Holds a Sprite task while a job runs.
+  Inert unless cron.provider=designinstantly.
+version: 0.1.0
+author: DesignInstantly

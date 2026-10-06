@@ -1,0 +1,15 @@
+{
+    "mode": "local_external",
+    "api_url": "{{HINDSIGHT_URL}}",
+    "bank_id": "{{BANK_ID}}",
+    "recall_budget": "mid",
+    "memory_mode": "hybrid",
+    "auto_recall": true,
+    "recall_sync": true,
+    "recall_types": "observation,world,experience",
+    "auto_retain": false,
+    "retain_async": true,
+    "retain_context": "The {{BRAND_NAME}} social media agent is speaking (its own run log)",
+    "recall_indicator": false,
+    "retain_indicator": false
+}

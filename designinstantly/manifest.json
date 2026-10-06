@@ -1,0 +1,27 @@
+{
+    "name": "designinstantly-brand-agent",
+    "version": "0.3.0",
+    "plugins": {
+        "hindsight": {
+            "catalog": "hindsight",
+            "note": "Installed from the Hermes plugin catalog of this checkout"
+        }
+    },
+    "placeholders": [
+        "BRAND_ID",
+        "BRAND_NAME",
+        "AGENT_ID",
+        "BANK_ID",
+        "TIMEZONE",
+        "DI_APP_URL",
+        "AGENT_CRON_URL",
+        "HINDSIGHT_URL"
+    ],
+    "secrets": [
+        "OPENROUTER_API_KEY",
+        "HINDSIGHT_API_KEY",
+        "AGENT_CRON_ARM_KEY",
+        "DI_MCP_TOKEN",
+        "API_SERVER_KEY"
+    ]
+}
