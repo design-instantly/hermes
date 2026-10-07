@@ -33,7 +33,7 @@ mcp_servers:
   designinstantly:
     url: "{{DI_APP_URL}}/api/mcp"
     headers:
-      # The co-worker's own token (in .env), scoped server-side to this brand and read-only tools.
+      # The co-worker's own token (in .env), scoped server-side to this brand.
       Authorization: "Bearer ${DI_MCP_TOKEN}"
 
 cron:
