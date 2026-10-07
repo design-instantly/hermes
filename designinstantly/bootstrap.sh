@@ -33,7 +33,12 @@ TEMPLATE_DIR="$CHECKOUT/designinstantly"
 VALUES="$HERMES_HOME/di-agent.json"
 STATUS_FILE="${DI_BOOTSTRAP_STATUS:-/tmp/di-bootstrap.status}"
 export PATH="$HOME/.local/bin:/.sprite/bin:$PATH"
-log() { echo "[bootstrap] $*"; }
+# Every line carries the time and the seconds since bootstrap started, so a slow run shows where.
+export DI_BOOTSTRAP_T0="${DI_BOOTSTRAP_T0:-$(date +%s%N)}"
+log() {
+  local ms=$(( ($(date +%s%N) - DI_BOOTSTRAP_T0) / 1000000 ))
+  printf '[bootstrap %s +%d.%03ds] %s\n' "$(date -u +%T)" $((ms / 1000)) $((ms % 1000)) "$*"
+}
 
 # ── 0. Keep the Sprite awake for the whole run ────────────────────────────────
 # A detached process holds no session or request, so without a Sprite task the VM may
@@ -49,11 +54,15 @@ stop_heartbeat() { [ -n "$HEARTBEAT" ] && kill "$HEARTBEAT" 2>/dev/null; HEARTBE
 finish() {
   code=$?
   stop_heartbeat
-  [ -S /.sprite/api.sock ] && sprite_api -X DELETE http://sprite/v1/tasks/di-bootstrap
+  # Report first: deleting a task that was re-registered or refreshed can block for ~30s, and the
+  # provisioner is waiting on this file. If the delete times out, the task just expires (5m).
   echo "$code" > "$STATUS_FILE"
+  log "exit $code"
+  [ -S /.sprite/api.sock ] && sprite_api --max-time 2 -X DELETE http://sprite/v1/tasks/di-bootstrap
 }
 if [ "${DI_BOOTSTRAP_REEXEC:-}" != 1 ]; then rm -f "$STATUS_FILE"; fi
 trap finish EXIT
+log "start${INPUT_DIR:+ with inputs}$([ "$BASE" = 1 ] && echo ' (--base)')"
 
 # ── 1. Hermes (and this template, which lives in it) at the fork's branch ────
 remote_sha=$(git ls-remote "$DI_HERMES_REPO" "refs/heads/$DI_HERMES_BRANCH" | cut -f1)
@@ -75,6 +84,7 @@ if [ "${DI_BOOTSTRAP_REEXEC:-}" != 1 ] && ! cmp -s "$0" "$TEMPLATE_DIR/bootstrap
   cp "$TEMPLATE_DIR/bootstrap.sh" "$next"
   stop_heartbeat
   trap - EXIT
+  log "continuing with the checkout's bootstrap.sh"
   exec env DI_BOOTSTRAP_REEXEC=1 DI_BOOTSTRAP_STATUS="$STATUS_FILE" bash "$next" "${ARGS[@]}"
 fi
 
@@ -102,6 +112,7 @@ if [ -n "$INPUT_DIR" ]; then
   done < <(tr -d '\r' < "$INPUT_DIR/secrets.env")
   tr -d '\r' < "$INPUT_DIR/fire-public.pem" > "$HERMES_HOME/agent-cron-fire-public.pem"
 fi
+log "inputs written"
 [ -f "$VALUES" ] || { log "no $VALUES: run once with an input_dir (commissioning)"; exit 1; }
 grep -q '^API_SERVER_KEY=' "$HERMES_HOME/.env" || set_env API_SERVER_KEY "$(openssl rand -hex 32)"
 set_env API_SERVER_ENABLED true
@@ -112,7 +123,7 @@ set_env HERMES_TIMEZONE "$(python3 -c "import json; print(json.load(open('$VALUE
 # ── 4. Template files + config overlay ────────────────────────────────────────
 # (The brand's Hindsight bank is created by the DesignInstantly app before this runs.)
 uv run --quiet --no-project --with pyyaml python3 "$TEMPLATE_DIR/apply.py" "$TEMPLATE_DIR" "$VALUES"
-hermes config set cron.chronos.nas_jwks_url "$(cat "$HERMES_HOME/agent-cron-fire-public.pem")" >/dev/null
+log "template applied"
 fi
 
 # ── 5. Plugins ────────────────────────────────────────────────────────────────
@@ -149,6 +160,7 @@ if ! memory_ready; then
   fi
   memory_ready || { log "hindsight plugin not available"; tail -20 /tmp/hindsight-plugin.log; exit 1; }
 fi
+log "memory plugin ready"
 
 # ── 6. Gateway as a Sprite service (the Sprite URL routes to it and wakes it) ──
 if sprite-env services get hermes-gateway >/dev/null 2>&1; then
@@ -158,8 +170,10 @@ else
     --dir "$HOME" --env "HOME=$HOME,PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" \
     --http-port 8642 --no-stream >/dev/null
 fi
-for _ in $(seq 1 60); do curl -sf -o /dev/null localhost:8642/health && break; sleep 2; done
+log "gateway (re)started"
+for _ in $(seq 1 240); do curl -sf -o /dev/null localhost:8642/health && break; sleep 0.5; done
 curl -sf -o /dev/null localhost:8642/health || { log "gateway did not become healthy"; exit 1; }
+log "gateway healthy"
 
 # ── 7. Record what was applied ────────────────────────────────────────────────
 sha=$(git -C "$CHECKOUT" rev-parse HEAD)

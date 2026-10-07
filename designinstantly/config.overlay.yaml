@@ -44,4 +44,4 @@ cron:
   chronos:                       # /api/cron/fire verifies agent-cron's ES256 token with these
     portal_url: "{{AGENT_CRON_URL}}"
     expected_audience: "agent:{{AGENT_ID}}"
-    # nas_jwks_url (the inline PEM public key) is written by bootstrap.sh from agent-cron-fire-public.pem
+    # nas_jwks_url (the inline PEM public key) is set by apply.py from agent-cron-fire-public.pem

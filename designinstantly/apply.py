@@ -4,7 +4,8 @@ Called by bootstrap.sh via `uv run --no-project --with pyyaml python3 apply.py <
 where <template_dir> is this fork's designinstantly/ directory.
 
 Template-owned files are (re)written on every run: SOUL.md (rendered from the fork's root SOUL.md),
-hindsight/config.json, and the config.yaml keys in config.overlay.yaml. The cron provider is bundled
+hindsight/config.json, and the config.yaml keys in config.overlay.yaml plus agent-cron's fire-token
+public key (cron.chronos.nas_jwks_url, from HERMES_HOME/agent-cron-fire-public.pem). The cron provider is bundled
 in the fork (plugins/cron_providers/designinstantly), not copied. Everything else in HERMES_HOME —
 .env secrets, skills, sessions, jobs — is left alone.
 """
@@ -69,6 +70,10 @@ def main() -> None:
     config_path = home / "config.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
     overlay = yaml.safe_load(render((template / "config.overlay.yaml").read_text(encoding="utf-8"), values))
+    # agent-cron's fire-token public key (inline PEM), written by bootstrap.sh from the inputs.
+    fire_key = home / "agent-cron-fire-public.pem"
+    if fire_key.exists():
+        overlay.setdefault("cron", {}).setdefault("chronos", {})["nas_jwks_url"] = fire_key.read_text(encoding="utf-8").strip()
     write_text(config_path, yaml.safe_dump(deep_merge(config or {}, overlay), sort_keys=False, allow_unicode=True))
 
     print(f"apply.py: template applied to {home}")
