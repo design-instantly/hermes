@@ -567,6 +567,7 @@ def _make_tool_handler(server_name: str, tool_name: str, tool_timeout: float):
         # Only a tool annotated readOnlyHint=True is replayed after session expiry; a 401 is always
         # pre-dispatch so the auth recoverer keeps its retry for every tool.
         read_only = _tool_is_read_only(server_name, tool_name)
+        raw = {}  # DESIGNINSTANTLY: A2UI — the raw result, for tools/a2ui_surfaces.py.
 
         async def _call():
             async with server._rpc_lock, _track_inflight_rpc(server, server_name, op, retry_safe=read_only):
@@ -577,16 +578,21 @@ def _make_tool_handler(server_name: str, tool_name: str, tool_timeout: float):
                     server._pending_call_context = None
             if getattr(server, "_mark_session_proven", None) is not None:  # round-trip done: transport healthy
                 server._mark_session_proven()
+            raw["result"] = result  # DESIGNINSTANTLY: A2UI
             return _render_call_tool_result(result, server_name)
 
         def _on_failure(exc):
             _core._bump_server_error(server_name)
             logger.error("MCP tool %s/%s call failed: %s", server_name, tool_name, exc)
         session_expired = partial(_handle_session_expired_and_retry, call_may_have_side_effects=not read_only)
-        return _dispatch(
+        rendered = _dispatch(
             server_name, server, op, _call, tool_timeout,
             (_handle_stdio_child_exited_and_retry, _handle_auth_error_and_retry, session_expired),
             _on_failure, record_outcome=True)
+        # DESIGNINSTANTLY: A2UI — record the call's surface for the runs API (tools/a2ui_surfaces.py).
+        from tools import a2ui_surfaces
+        a2ui_surfaces.remember(server_name, tool_name, raw.get("result"))
+        return rendered
     return _handler
 
 

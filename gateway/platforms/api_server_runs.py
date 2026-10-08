@@ -333,6 +333,12 @@ def _make_run_event_callback(self, run_id: str, loop: "asyncio.AbstractEventLoop
             if event_type == "tool.completed":
                 event_fields["preview"] = _tool_completed_preview(
                     kwargs.get("result"), redact_sensitive_text)
+                # DESIGNINSTANTLY: A2UI — the surface the call rendered, for the client to show
+                # (tools/a2ui_surfaces.py). Not redacted: it is the MCP server's own tool output.
+                from tools import a2ui_surfaces
+                a2ui = a2ui_surfaces.take(tool_name)
+                if a2ui:
+                    event_fields["a2ui"] = a2ui
             _push(_run_event(run_id, event_type, **event_fields))
         elif event_type in {"subagent.start", "subagent.complete"}:
             event = _run_event(run_id, event_type)
