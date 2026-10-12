@@ -30,7 +30,10 @@ code_execution:
   mode: project
 
 web:
-  search_backend: ddgs           # DuckDuckGo, keyless (bootstrap.sh installs the ddgs extra); extract stays default
+  search_backend: ddgs           # DuckDuckGo, keyless (bootstrap.sh installs the ddgs extra); search only
+  extract_backend: keenable      # Keenable's keyless public endpoint, the most generous free tier (~1,000/h);
+  provider_tier:                 # on a rate limit Hermes retries on the other keyless vendors
+    keenable: free
 
 browser:
   backend: "browser-use"         # one browser_exec tool on Hermes' packaged Chromium (never a cloud provider:
