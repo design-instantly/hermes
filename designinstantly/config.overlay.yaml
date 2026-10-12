@@ -7,15 +7,12 @@ model:
   base_url: https://openrouter.ai/api/v1
 
 agent:
-  # A social media manager works through DesignInstantly's MCP, memory and skills — not a shell.
-  # No terminal/file/code also means an injected prompt cannot read secrets from disk.
+  # The Sprite is this brand's alone, so Otto has the machine: a terminal, files, Python and a
+  # browser (Hermes' Browser Use mode on its packaged Chromium) and web search. Every secret in ~/.hermes/.env is
+  # this brand's own, except HINDSIGHT_API_KEY on a self-hosted memory host, which has no scoped keys
+  # yet and so reaches every bank there (risk accepted 2026-10-12; Hindsight Cloud keys are scoped).
   disabled_toolsets:
-    - terminal
-    - file
-    - code_execution
-    - browser
     - computer_use
-    - web
     - image_gen
     - tts
     - vision
@@ -23,6 +20,32 @@ agent:
     - cronjob          # schedules come from the template / DesignInstantly, not the agent
     - clarify          # runs are headless; there is nobody to answer
     - connections
+
+terminal:
+  backend: local
+  cwd: "."
+  timeout: 180
+
+code_execution:
+  mode: project
+
+web:
+  search_backend: ddgs           # DuckDuckGo, keyless (bootstrap.sh installs the ddgs extra); extract stays default
+
+browser:
+  backend: "browser-use"         # one browser_exec tool on Hermes' packaged Chromium (never a cloud provider:
+  inactivity_timeout: 120        # BROWSER_USE_API_KEY / BROWSERBASE_API_KEY must never be in .env)
+
+# Runs are headless (API server, cron): nobody is there to answer an approval, and on /v1/runs a
+# flagged command would otherwise wait out the timeout. The deny list still blocks under mode "off".
+approvals:
+  mode: "off"
+  unattended_mode: approve
+  cron_mode: approve
+  timeout: 30
+  deny:                          # Otto must not stop or rewire its own gateway
+    - "sprite-env services *"
+    - "*hermes gateway*"
 
 memory:
   provider: hindsight

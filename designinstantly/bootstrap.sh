@@ -71,7 +71,7 @@ current_sha=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || echo none)
 if [ "$current_sha" != "$remote_sha" ]; then
   log "installing $DI_HERMES_BRANCH@${remote_sha:0:10} (was ${current_sha:0:10})"
   curl -fsSL "$DI_HERMES_RAW/$DI_HERMES_BRANCH/scripts/install.sh" -o /tmp/hermes-install.sh
-  HERMES_REPO_URL="$DI_HERMES_REPO" bash /tmp/hermes-install.sh --non-interactive --skip-browser --branch "$DI_HERMES_BRANCH" \
+  HERMES_REPO_URL="$DI_HERMES_REPO" bash /tmp/hermes-install.sh --non-interactive --branch "$DI_HERMES_BRANCH" \
     >/tmp/hermes-install.log 2>&1 || { tail -40 /tmp/hermes-install.log; exit 1; }
   rm -f /tmp/hermes-install.sh
 else
@@ -92,14 +92,36 @@ manifest() { python3 -c "import json,sys; d=json.load(open('$TEMPLATE_DIR/manife
 VERSION=$(manifest "['version']")
 HINDSIGHT_PLUGIN=$(manifest "['plugins']['hindsight']['catalog']")
 
-# ── 2. Hermes' bundled skill catalogue stays ──────────────────────────────────
+# ── 2. Browser: Hermes' packaged Chromium and the system libraries it links against ──
+# Spares get it too, so a claimed spare is ready to browse. The library list is the fork's
+# Dockerfile one (the `ldd ... | grep "not found"` set of the pinned Chromium) plus fonts.
+CHROMIUM_LIBS="libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 libcairo2 libcups2t64 \
+  libdbus-1-3 libgbm1 libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 libxcomposite1 \
+  libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2 fonts-liberation fonts-noto-color-emoji"
+missing_libs=$(for p in $CHROMIUM_LIBS; do dpkg -s "$p" >/dev/null 2>&1 || echo "$p"; done)
+if [ -n "$missing_libs" ]; then
+  sudo -n true 2>/dev/null || { log "Chromium libraries missing and no sudo: $missing_libs"; exit 1; }
+  log "installing Chromium libraries"
+  sudo -n apt-get -o Acquire::Retries=3 update -qq >/tmp/di-apt.log 2>&1
+  # shellcheck disable=SC2086
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y -qq --no-install-recommends \
+    $missing_libs >>/tmp/di-apt.log 2>&1 || { tail -20 /tmp/di-apt.log; exit 1; }
+fi
+# Idempotent; also clears an earlier --skip-browser opt-out. Fails the run (and so the spare) if not ready.
+hermes pm install agent-browser >/tmp/di-browser.log 2>&1 || { log "agent-browser did not install"; tail -20 /tmp/di-browser.log; exit 1; }
+log "browser ready"
+# Web search (web.search_backend: ddgs). pm records the extra, so later Hermes updates keep it.
+hermes pm install --extra ddgs >/tmp/di-ddgs.log 2>&1 || { log "ddgs did not install"; tail -20 /tmp/di-ddgs.log; exit 1; }
+log "web search ready"
+
+# ── 3. Hermes' bundled skill catalogue stays ──────────────────────────────────
 # Undo an earlier opt-out, if any.
 if [ -f "$HERMES_HOME/.no-bundled-skills" ]; then
   hermes skills opt-in --sync >/dev/null
 fi
 
 if [ "$BASE" = 0 ]; then
-# ── 3. Inputs: keep the brand's values; merge secrets (.env is agent-owned) ───
+# ── 4. Inputs: keep the brand's values; merge secrets (.env is agent-owned) ───
 touch "$HERMES_HOME/.env"; chmod 600 "$HERMES_HOME/.env"
 set_env() {  # set_env KEY VALUE
   sed -i "/^$1=/d" "$HERMES_HOME/.env"
@@ -120,13 +142,13 @@ set_env API_SERVER_HOST 0.0.0.0
 set_env API_SERVER_PORT 8642
 set_env HERMES_TIMEZONE "$(python3 -c "import json; print(json.load(open('$VALUES'))['TIMEZONE'])")"
 
-# ── 4. Template files + config overlay ────────────────────────────────────────
+# ── 5. Template files + config overlay ────────────────────────────────────────
 # (The brand's Hindsight bank is created by the DesignInstantly app before this runs.)
 uv run --quiet --no-project --with pyyaml python3 "$TEMPLATE_DIR/apply.py" "$TEMPLATE_DIR" "$VALUES"
 log "template applied"
 fi
 
-# ── 5. Plugins ────────────────────────────────────────────────────────────────
+# ── 6. Plugins ────────────────────────────────────────────────────────────────
 # Hindsight comes from the Hermes catalog. Hermes only installs a plugin's Python deps after a
 # y/N answer on a TTY, so answer it inside a pty. The designinstantly cron provider is bundled in
 # this fork (plugins/cron_providers/designinstantly); nothing to install.
@@ -162,7 +184,7 @@ if ! memory_ready; then
 fi
 log "memory plugin ready"
 
-# ── 6. Gateway as a Sprite service (the Sprite URL routes to it and wakes it) ──
+# ── 7. Gateway as a Sprite service (the Sprite URL routes to it and wakes it) ──
 if sprite-env services get hermes-gateway >/dev/null 2>&1; then
   sprite-env services restart hermes-gateway >/dev/null 2>&1
 else
@@ -175,7 +197,7 @@ for _ in $(seq 1 240); do curl -sf -o /dev/null localhost:8642/health && break; 
 curl -sf -o /dev/null localhost:8642/health || { log "gateway did not become healthy"; exit 1; }
 log "gateway healthy"
 
-# ── 7. Record what was applied ────────────────────────────────────────────────
+# ── 8. Record what was applied ────────────────────────────────────────────────
 sha=$(git -C "$CHECKOUT" rev-parse HEAD)
 printf '{"version":"%s","branch":"%s","commit":"%s","applied_at":"%s"}\n' \
   "$VERSION" "$DI_HERMES_BRANCH" "$sha" "$(date -u +%FT%TZ)" > "$HERMES_HOME/di-template.json"
