@@ -110,9 +110,7 @@ fi
 # Idempotent; also clears an earlier --skip-browser opt-out. Fails the run (and so the spare) if not ready.
 hermes pm install agent-browser >/tmp/di-browser.log 2>&1 || { log "agent-browser did not install"; tail -20 /tmp/di-browser.log; exit 1; }
 log "browser ready"
-# Web search (web.search_backend: ddgs). pm records the extra, so later Hermes updates keep it.
-hermes pm install --extra ddgs >/tmp/di-ddgs.log 2>&1 || { log "ddgs did not install"; tail -20 /tmp/di-ddgs.log; exit 1; }
-log "web search ready"
+# Web search and page reading are OpenRouter server tools in the model preset: nothing to install.
 
 # ── 3. Hermes' bundled skill catalogue stays ──────────────────────────────────
 # Undo an earlier opt-out, if any.
@@ -150,8 +148,8 @@ fi
 
 # ── 6. Plugins ────────────────────────────────────────────────────────────────
 # Hindsight comes from the Hermes catalog. Hermes only installs a plugin's Python deps after a
-# y/N answer on a TTY, so answer it inside a pty. The designinstantly cron provider is bundled in
-# this fork (plugins/cron_providers/designinstantly); nothing to install.
+# y/N answer on a TTY, so answer it inside a pty. The designinstantly cron provider and the
+# designinstantly_energy plugin are bundled in this fork; the energy plugin only needs enabling.
 memory_ready() { hermes memory status 2>/dev/null | grep -Eq "Status: +available"; }
 in_pty() {  # in_pty "<hermes args>" — answers "y" to Hermes' dependency prompt; returns when the command does
   # script(1) exits only once its stdin closes, not when the command does, and closing stdin
@@ -183,6 +181,10 @@ if ! memory_ready; then
   memory_ready || { log "hindsight plugin not available"; tail -20 /tmp/hindsight-plugin.log; exit 1; }
 fi
 log "memory plugin ready"
+# Ends a run with Otto's own reply once the owner's Energy key is spent (bundled: no prompt, no pty).
+hermes plugins enable designinstantly_energy >/tmp/di-energy-plugin.log 2>&1 \
+  || { log "energy plugin did not enable"; tail -20 /tmp/di-energy-plugin.log; exit 1; }
+log "energy plugin ready"
 
 # ── 7. Gateway as a Sprite service (the Sprite URL routes to it and wakes it) ──
 if sprite-env services get hermes-gateway >/dev/null 2>&1; then

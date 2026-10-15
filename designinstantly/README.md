@@ -12,15 +12,35 @@ keys, and runs `bootstrap.sh`.
 | `SOUL.md` (repo root) | Otto's persona, rendered per brand into `~/.hermes/SOUL.md` |
 | `hermes_cli/default_soul.py` | Hermes' built-in fallback persona, also Otto |
 | `plugins/cron_providers/designinstantly/` | Cron provider backed by agent-cron, so idle Sprites can sleep |
+| `plugins/designinstantly_energy/` | Ends a run with Otto's own reply once the owner's Energy is spent, instead of failing it |
 | `designinstantly/bootstrap.sh` | Commissions or updates a Sprite (idempotent) |
 | `designinstantly/apply.py` | Renders SOUL and the Hindsight plugin config; merges our config.yaml keys |
-| `designinstantly/config.overlay.yaml` | Our config.yaml keys: model preset, disabled toolsets, memory, MCP, cron |
+| `designinstantly/config.overlay.yaml` | Our config.yaml keys: model presets, disabled toolsets, turn cap, memory, MCP, cron |
 | `designinstantly/hindsight.json` | Hindsight plugin config on the Sprite (server, the brand's bank, recall/retain) |
 | `designinstantly/hindsight-bank.json` | The brand's bank profile; the app creates the bank from it |
 | `designinstantly/manifest.json` | Template version, placeholders and secrets the app provides |
 
 `SOUL.md` and `hermes_cli/default_soul.py` are marked `-merge` in `.gitattributes`: any upstream
 change to them stops a sync so an engineer reviews it against Otto's version.
+
+## Fleet config in OpenRouter presets
+
+Some of Otto's config isn't in this repo: it lives in two OpenRouter presets, and an edit there
+reaches every co-worker on its next call, with no push or bootstrap. Treat a preset edit like a deploy.
+
+| Preset | Holds |
+|---|---|
+| `@preset/agent-hermes` | Otto's model, plus the **Web Search** and **Web Fetch** server tools (OpenRouter runs them inside the request) |
+| `@preset/agent-hermes-aux` | The model for Hermes' background calls (compaction, titles, MCP sampling, approvals, the post-turn review). **No tools**, so a background call can never run a paid search |
+
+To switch search engines (Exa, Parallel, ...), change Web Search's engine in `agent-hermes`. Pick an
+explicit engine, not Auto: Auto follows the model's own search when the model has one, so swapping
+the model would silently change the search vendor and its price. Keep `max_results` /
+`max_total_results` (search) and `max_uses` (fetch) set, since one request can search several times.
+
+Everything (the model, both presets' tools) runs on `OPENROUTER_API_KEY`, which is the brand owner's
+Energy key: OpenRouter meters it and refuses calls once the owner's Energy is spent. Hermes' own
+`web` tools are disabled so nothing searches outside the key.
 
 ## Branch
 

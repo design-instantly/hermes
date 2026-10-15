@@ -2,15 +2,20 @@
 # Secrets never appear here — they live in ~/.hermes/.env (see manifest.json "secrets").
 
 model:
-  default: "@preset/agent-hermes"      # role → OpenRouter preset; change the model fleet-wide there
+  # Role → OpenRouter preset; change the model fleet-wide there. The preset also carries Otto's web
+  # search and page reading (OpenRouter's Web Search / Web Fetch server tools): pick their engine
+  # (Exa, Parallel, ...) in the preset, never here. Everything runs on OPENROUTER_API_KEY, which is
+  # the brand owner's Energy key, so OpenRouter meters it all and stops it when Energy runs out.
+  default: "@preset/agent-hermes"
   provider: openrouter
   base_url: https://openrouter.ai/api/v1
 
 agent:
   # The Sprite is this brand's alone, so Otto has the machine: a terminal, files, Python and a
-  # browser (Hermes' Browser Use mode on its packaged Chromium) and web search. Every secret in ~/.hermes/.env is
-  # this brand's own, except HINDSIGHT_API_KEY on a self-hosted memory host, which has no scoped keys
-  # yet and so reaches every bank there (risk accepted 2026-10-12; Hindsight Cloud keys are scoped).
+  # browser (Hermes' Browser Use mode on its packaged Chromium). Web search is the preset's server tool.
+  # Every secret in ~/.hermes/.env is this brand's or its owner's own, except HINDSIGHT_API_KEY on a
+  # self-hosted memory host, which has no scoped keys yet and so reaches every bank there (risk
+  # accepted 2026-10-12; Hindsight Cloud keys are scoped).
   disabled_toolsets:
     - computer_use
     - image_gen
@@ -20,6 +25,21 @@ agent:
     - cronjob          # schedules come from the template / DesignInstantly, not the agent
     - clarify          # runs are headless; there is nobody to answer
     - connections
+    - web              # search and page reading are the preset's OpenRouter server tools instead
+    - search
+  # A runaway loop spends the owner's Energy; no single run needs more turns than this.
+  max_turns: 60
+
+# Hermes' own background calls (compaction, titles, MCP sampling, approvals, the post-turn review)
+# would otherwise inherit the main preset and its paid web tools. This preset has no tools.
+auxiliary:
+  compression: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  title_generation: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  mcp: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  approval: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  memory_query_rewrite: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  curator: { provider: openrouter, model: "@preset/agent-hermes-aux" }
+  background_review: { provider: openrouter, model: "@preset/agent-hermes-aux" }
 
 terminal:
   backend: local
@@ -28,12 +48,6 @@ terminal:
 
 code_execution:
   mode: project
-
-web:
-  search_backend: ddgs           # DuckDuckGo, keyless (bootstrap.sh installs the ddgs extra); search only
-  extract_backend: keenable      # Keenable's keyless public endpoint, the most generous free tier (~1,000/h);
-  provider_tier:                 # on a rate limit Hermes retries on the other keyless vendors
-    keenable: free
 
 browser:
   backend: "browser-use"         # one browser_exec tool on Hermes' packaged Chromium (never a cloud provider:

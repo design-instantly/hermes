@@ -1,0 +1,8 @@
+name: designinstantly_energy
+version: "0.1.0"
+description: "DesignInstantly: end a run with Otto's own reply once the brand owner's Energy (their OpenRouter key's spending limit) is spent, instead of failing it. Registers llm_execution middleware and a pre_tool_call hook."
+author: "DesignInstantly"
+provides_hooks:
+  - pre_tool_call
+provides_middleware:
+  - llm_execution
