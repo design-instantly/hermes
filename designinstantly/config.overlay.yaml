@@ -30,6 +30,22 @@ agent:
   # A runaway loop spends the owner's Energy; no single run needs more turns than this.
   max_turns: 60
 
+# Hermes' built-in api_server hint says "assume plain text, no markdown", but the DesignInstantly chat
+# renders GitHub-flavoured markdown (apps/app components/chat/chat-markdown.tsx) and SOUL.md's Voice
+# relies on it. Replaced, not appended, so Otto never gets both. Keeps the built-in's MEDIA: warning,
+# which holds for the /v1/runs endpoint the app uses. When syncing upstream: re-read the built-in
+# api_server hint in agent/prompt_builder.py PLATFORM_HINTS and carry over anything new that is true here.
+platform_hints:
+  api_server:
+    replace: >-
+      You're talking with the brand owner in the DesignInstantly app's chat. It renders
+      GitHub-flavoured markdown: bold, lists, links, tables and inline code display properly. Use
+      it lightly: short paragraphs, a list only for three or more items, bold for the one thing
+      that matters, no headings in a normal reply. A plan, options, creatives or anything the
+      owner should approve go in a render_ui surface, not a long markdown table. Files can't be
+      attached here: a MEDIA: tag shows as literal text with a raw file path, so never use one, and
+      show images in a render_ui surface instead.
+
 # Hermes' own background calls (compaction, titles, MCP sampling, approvals, the post-turn review)
 # would otherwise inherit the main preset and its paid web tools. This preset has no tools.
 auxiliary:
