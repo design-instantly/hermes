@@ -50,7 +50,7 @@ so a change reaches dev first, then staging, and production last:
 
 | Fork branch | Runs on | Set by |
 |---|---|---|
-| `feature/agents` (the current feature branch) | dev co-workers | `COWORKER_BRANCH` in the app's dev env |
+| `feature` | dev co-workers | `COWORKER_BRANCH` in the app's dev env |
 | `integration` | staging co-workers | `COWORKER_BRANCH` in the app's staging env |
 | `main` | production co-workers | the default when `COWORKER_BRANCH` is unset |
 
@@ -66,8 +66,8 @@ for staging; merge `integration` into `main` for production.
 Merge into the feature branch first, so upstream changes take the same dev → staging → production path:
 
 ```bash
-git fetch upstream && git checkout -b sync/upstream feature/agents && git merge upstream/main
-# resolve the conflicts on our owned files, then open a PR into feature/agents
+git fetch upstream && git checkout -b sync/upstream feature && git merge upstream/main
+# resolve the conflicts on our owned files, then open a PR into feature
 ```
 
 ## Running it

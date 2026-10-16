@@ -96,6 +96,16 @@ remote_sha=$(git ls-remote "$DI_HERMES_REPO" "refs/heads/$DI_HERMES_BRANCH" | cu
 current_sha=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || echo none)
 if [ "$current_sha" != "$remote_sha" ]; then
   log "installing $DI_HERMES_BRANCH@${remote_sha:0:10} (was ${current_sha:0:10})"
+  # Moving to another branch (a new environment, or a renamed branch): drop the checkout's old
+  # branch and its stale remote refs first, or git refuses a name that collides with one of them
+  # (feature/agents vs feature). The checkout holds no work of its own.
+  current_branch=$(git -C "$CHECKOUT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  if [ -n "$current_branch" ] && [ "$current_branch" != "$DI_HERMES_BRANCH" ]; then
+    log "leaving branch $current_branch"
+    git -C "$CHECKOUT" checkout -q --detach
+    git -C "$CHECKOUT" branch -q -D "$current_branch"
+    git -C "$CHECKOUT" remote prune origin >/dev/null
+  fi
   fork_file scripts/install.sh /tmp/hermes-install.sh
   HERMES_REPO_URL="$DI_HERMES_REPO" bash /tmp/hermes-install.sh --non-interactive --branch "$DI_HERMES_BRANCH" \
     >/tmp/hermes-install.log 2>&1 || { tail -40 /tmp/hermes-install.log; exit 1; }
