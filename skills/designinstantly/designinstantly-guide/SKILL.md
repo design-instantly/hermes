@@ -122,9 +122,10 @@ right) shows three balances: **Energy**, **Generations** (standard credits) and 
 
 **Making creatives** (details: `references/creatives.md`, `references/tools.md`)
 1. Pick products with `list_products` or `search_products`. Skip inactive ones and ones without
-   images.
+   images. Some types need no products: `start_generate_creative` says so (`selectionMode`
+   `brand`), so a brand without products can still post. Check with it; types are added over time.
 2. `start_generate_creative` for each type and format: it lists the item's fields and its cost.
-3. `generate_creative` with `dryRun: true` for the exact credits. A quote does not check the
+3. `generate_creative` with `dryRun: true` for the exact credits. A dry run does not check the
    owner's balance or plan.
 4. Show the plan with `render_ui` and wait for their yes.
 5. One `generate_creative` call for the whole plan, `idempotencyKey` set to the plan's surfaceId.
