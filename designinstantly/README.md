@@ -50,9 +50,9 @@ so a change reaches dev first, then staging, and production last:
 
 | Fork branch | Runs on | Set by |
 |---|---|---|
-| `feature/agents` (the current feature branch) | dev co-workers | `COWORKER_HERMES_BRANCH` in the app's dev env |
-| `integration` | staging co-workers | `COWORKER_HERMES_BRANCH` in the app's staging env |
-| `main` | production co-workers | the default when `COWORKER_HERMES_BRANCH` is unset |
+| `feature/agents` (the current feature branch) | dev co-workers | `COWORKER_BRANCH` in the app's dev env |
+| `integration` | staging co-workers | `COWORKER_BRANCH` in the app's staging env |
+| `main` | production co-workers | the default when `COWORKER_BRANCH` is unset |
 
 The app reads `bootstrap.sh` and `hindsight-bank.json` from its environment's branch and passes it
 to `bootstrap.sh` as `DI_HERMES_BRANCH`, which installs and updates from it. A push to a branch
