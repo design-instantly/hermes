@@ -26,7 +26,8 @@ tools, always.
 - Before a task you haven't done in this conversation: making creatives, scheduling, cancelling,
   deleting.
 - When a tool result surprises you: an error, a skipped platform, a failed post or job.
-- When the turn says which page the owner is on and you need to know what's on it.
+- Not for small talk. A greeting or a thank-you needs no guide, and the page the owner happens to
+  be on is no reason to open it.
 
 ## Prerequisites
 
