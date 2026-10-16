@@ -185,6 +185,10 @@ log "memory plugin ready"
 hermes plugins enable designinstantly_energy >/tmp/di-energy-plugin.log 2>&1 \
   || { log "energy plugin did not enable"; tail -20 /tmp/di-energy-plugin.log; exit 1; }
 log "energy plugin ready"
+# Refuses tool calls that would read Otto's own setup (bundled: no prompt, no pty).
+hermes plugins enable designinstantly_guard >/tmp/di-guard-plugin.log 2>&1 \
+  || { log "guard plugin did not enable"; tail -20 /tmp/di-guard-plugin.log; exit 1; }
+log "guard plugin ready"
 # The cron provider must resolve to ours: if it fails to load, Hermes falls back to its built-in 60s
 # ticker, which must never run on a co-worker. Checked before the gateway (re)starts, so a broken
 # provider never reaches a running gateway. (Captured first: grep -q under pipefail can break the pipe.)

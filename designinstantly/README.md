@@ -13,6 +13,7 @@ keys, and runs `bootstrap.sh`.
 | `hermes_cli/default_soul.py` | Hermes' built-in fallback persona, also Otto |
 | `plugins/cron_providers/designinstantly/` | Cron provider backed by agent-cron, so idle Sprites can sleep |
 | `plugins/designinstantly_energy/` | Ends a run with Otto's own reply once the owner's Energy is spent, instead of failing it |
+| `plugins/designinstantly_guard/` | Refuses tool calls that would read Otto's own setup (Hermes home, Sprite socket, environment, `hermes` CLI) |
 | `designinstantly/bootstrap.sh` | Commissions or updates a Sprite (idempotent) |
 | `designinstantly/apply.py` | Renders SOUL and the Hindsight plugin config; merges our config.yaml keys |
 | `designinstantly/config.overlay.yaml` | Our config.yaml keys: model presets, disabled toolsets, turn cap, memory, MCP, cron |

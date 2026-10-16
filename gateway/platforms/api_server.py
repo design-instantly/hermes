@@ -2451,7 +2451,10 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         """GET /health — simple health check."""
-        return web.json_response({"status": "ok", "platform": "hermes-agent", "version": _hermes_version()})
+        # DESIGNINSTANTLY: a co-worker's URL is public and this check is unauthenticated, so it
+        # doesn't name the agent or its version (/health/detailed, behind auth, still does).
+        # WHEN SYNCING UPSTREAM: keep the body to {"status": "ok"}; nothing in Hermes reads the rest.
+        return web.json_response({"status": "ok"})
 
     @_require_auth
     async def _handle_health_detailed(self, request: "web.Request") -> "web.Response":

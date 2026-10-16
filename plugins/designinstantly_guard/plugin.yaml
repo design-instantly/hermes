@@ -1,0 +1,6 @@
+name: designinstantly_guard
+version: "0.1.0"
+description: "DesignInstantly: refuse tool calls that would read the co-worker's own setup (the Hermes home, the Sprite socket, process environments, hermes/sprite-env commands), so Otto can't be talked into revealing how he's built. Registers a pre_tool_call hook."
+author: "DesignInstantly"
+provides_hooks:
+  - pre_tool_call
