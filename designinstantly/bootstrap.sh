@@ -11,6 +11,8 @@
 #   <input_dir>/secrets.env      KEY=value lines for manifest.json "secrets" (merged into ~/.hermes/.env)
 #   <input_dir>/fire-public.pem  agent-cron's fire-token public key
 # Without input_dir it reuses what an earlier run kept: ~/.hermes/di-agent.json, .env and the key.
+# DI_GITHUB_TOKEN_FILE (optional): a file holding a short-lived read token for a private fork,
+# deleted as soon as it is read.
 #
 # Always run a copy outside the checkout (e.g. /tmp): the update step rewrites the checkout, and
 # bash reads a script as it runs. The exit code is written to $DI_BOOTSTRAP_STATUS (default
@@ -19,8 +21,31 @@ set -euo pipefail
 
 DI_HERMES_REPO="${DI_HERMES_REPO:-https://github.com/design-instantly/hermes.git}"
 DI_HERMES_BRANCH="${DI_HERMES_BRANCH:-main}"
-DI_HERMES_RAW="${DI_HERMES_REPO%.git}"
-DI_HERMES_RAW="https://raw.githubusercontent.com/${DI_HERMES_RAW#https://github.com/}"
+DI_HERMES_SLUG="${DI_HERMES_REPO%.git}"
+DI_HERMES_SLUG="${DI_HERMES_SLUG#https://github.com/}"
+
+# The fork can be private. The DesignInstantly app then leaves a short-lived, read-only GitHub token
+# in $DI_GITHUB_TOKEN_FILE for this run only: read it and delete the file at once. Git gets it as an
+# env-only header (never written to a .git/config), downloads as a request header, and it never
+# reaches the gateway (a Sprite service with its own env). Without one, the fork is read anonymously.
+if [ -n "${DI_GITHUB_TOKEN_FILE:-}" ] && [ -f "$DI_GITHUB_TOKEN_FILE" ]; then
+  DI_GITHUB_TOKEN="$(cat "$DI_GITHUB_TOKEN_FILE")"
+  rm -f "$DI_GITHUB_TOKEN_FILE"
+  export DI_GITHUB_TOKEN
+fi
+if [ -n "${DI_GITHUB_TOKEN:-}" ]; then
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+    GIT_CONFIG_VALUE_0="Authorization: Basic $(printf 'x-access-token:%s' "$DI_GITHUB_TOKEN" | base64 -w0)"
+fi
+# One file of the fork at the branch: through the API with the token, else from the raw host.
+fork_file() {  # fork_file <path in the repo> <output file>
+  if [ -n "${DI_GITHUB_TOKEN:-}" ]; then
+    curl -fsSL --retry 3 -H "Authorization: Bearer $DI_GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" \
+      "https://api.github.com/repos/$DI_HERMES_SLUG/contents/$1?ref=$DI_HERMES_BRANCH" -o "$2"
+  else
+    curl -fsSL --retry 3 "https://raw.githubusercontent.com/$DI_HERMES_SLUG/$DI_HERMES_BRANCH/$1" -o "$2"
+  fi
+}
 
 ARGS=("$@")
 BASE=0
@@ -70,7 +95,7 @@ remote_sha=$(git ls-remote "$DI_HERMES_REPO" "refs/heads/$DI_HERMES_BRANCH" | cu
 current_sha=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || echo none)
 if [ "$current_sha" != "$remote_sha" ]; then
   log "installing $DI_HERMES_BRANCH@${remote_sha:0:10} (was ${current_sha:0:10})"
-  curl -fsSL "$DI_HERMES_RAW/$DI_HERMES_BRANCH/scripts/install.sh" -o /tmp/hermes-install.sh
+  fork_file scripts/install.sh /tmp/hermes-install.sh
   HERMES_REPO_URL="$DI_HERMES_REPO" bash /tmp/hermes-install.sh --non-interactive --branch "$DI_HERMES_BRANCH" \
     >/tmp/hermes-install.log 2>&1 || { tail -40 /tmp/hermes-install.log; exit 1; }
   rm -f /tmp/hermes-install.sh
