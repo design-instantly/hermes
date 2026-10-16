@@ -185,6 +185,13 @@ log "memory plugin ready"
 hermes plugins enable designinstantly_energy >/tmp/di-energy-plugin.log 2>&1 \
   || { log "energy plugin did not enable"; tail -20 /tmp/di-energy-plugin.log; exit 1; }
 log "energy plugin ready"
+# The cron provider must resolve to ours: if it fails to load, Hermes falls back to its built-in 60s
+# ticker, which must never run on a co-worker. Checked before the gateway (re)starts, so a broken
+# provider never reaches a running gateway. (Captured first: grep -q under pipefail can break the pipe.)
+cron_status=$(hermes cron status 2>&1 || true)
+grep -q "Cron provider: designinstantly" <<<"$cron_status" \
+  || { log "cron provider designinstantly did not load"; tail -20 <<<"$cron_status"; exit 1; }
+log "cron provider ready"
 
 # ── 7. Gateway as a Sprite service (the Sprite URL routes to it and wakes it) ──
 if sprite-env services get hermes-gateway >/dev/null 2>&1; then

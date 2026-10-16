@@ -7,6 +7,10 @@ settings (``nas_jwks_url`` = our public key PEM, ``expected_audience``, ``portal
 
 While a fired job runs, the provider holds a Sprite *task* so the VM cannot pause mid-run.
 
+Fails closed: Hermes falls back to its built-in ticker whenever a named provider reports itself
+unavailable, so this one always reports available. Missing config surfaces at arm time instead:
+``register_job`` raises, and the cronjob tool reports the job as saved but not scheduled.
+
 Config (config.yaml):
     cron.provider: designinstantly
     cron.designinstantly.arm_url: https://agent-cron.<domain>/v1
@@ -46,6 +50,17 @@ def _cfg(*keys: str, default: Any = "") -> Any:
         return cfg_get(load_config(), *keys, default=default)
     except Exception:
         return default
+
+
+def _missing_config() -> list[str]:
+    """The settings arming needs that are not set (no network)."""
+    return [
+        name for name, value in (
+            ("cron.designinstantly.arm_url", _cfg("cron", "designinstantly", "arm_url")),
+            ("cron.designinstantly.agent_id", _cfg("cron", "designinstantly", "agent_id")),
+            ("AGENT_CRON_ARM_KEY", os.environ.get("AGENT_CRON_ARM_KEY")),
+        ) if not value
+    ]
 
 
 def _is_schedulable(job: Dict[str, Any]) -> bool:
@@ -135,16 +150,18 @@ class DesignInstantlyCronScheduler(CronScheduler):
         return "designinstantly"
 
     def is_available(self) -> bool:
-        """Config presence only — no network. Unavailable -> built-in ticker takes over."""
-        return bool(
-            _cfg("cron", "designinstantly", "arm_url")
-            and _cfg("cron", "designinstantly", "agent_id")
-            and os.environ.get("AGENT_CRON_ARM_KEY")
-        )
+        """Always True. Hermes resolves this provider only when ``cron.provider`` names it, and
+        False would hand cron to the built-in 60s ticker, which must never run on a co-worker.
+        Missing config fails each arm instead (see ``_post``)."""
+        return True
 
     def start(self, stop_event, *, adapters=None, loop=None, interval=60):
         """Converge agent-cron with jobs.json, then RETURN — no loop, no periodic wake."""
         self.recover_interrupted()
+        missing = _missing_config()
+        if missing:
+            logger.error("designinstantly: cannot arm jobs, missing %s; no job will fire", ", ".join(missing))
+            return
         self._reconcile_logged("start()")
 
     def stop(self) -> None:
@@ -220,6 +237,9 @@ class DesignInstantlyCronScheduler(CronScheduler):
         return str(_cfg("cron", "designinstantly", "agent_id"))
 
     def _post(self, action: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        missing = _missing_config()
+        if missing:
+            raise RuntimeError(f"designinstantly cron provider is not configured: missing {', '.join(missing)}")
         url = f"{str(_cfg('cron', 'designinstantly', 'arm_url')).rstrip('/')}/{action}"
         req = urllib.request.Request(
             url,

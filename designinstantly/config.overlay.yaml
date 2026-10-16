@@ -22,7 +22,6 @@ agent:
     - tts
     - vision
     - delegation
-    - cronjob          # schedules come from the template / DesignInstantly, not the agent
     - clarify          # runs are headless; there is nobody to answer
     - connections
     - web              # search and page reading are the preset's OpenRouter server tools instead
@@ -92,6 +91,11 @@ mcp_servers:
       # The co-worker's own token (in .env), scoped server-side to this brand.
       Authorization: "Bearer ${DI_MCP_TOKEN}"
 
+# Otto schedules his own work with the cronjob tool (enabled above); this provider decides when it
+# fires. It arms one agent-cron one-shot per job, so Hermes' built-in 60s ticker never runs and an
+# idle Sprite can sleep. The provider fails closed: misconfigured, it refuses to arm instead of
+# letting Hermes fall back to the built-in ticker. Cron runs themselves still can't create jobs
+# (cron.allow_agent_scheduling stays at its default, false).
 cron:
   provider: designinstantly
   designinstantly:
