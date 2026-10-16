@@ -43,17 +43,31 @@ Everything (the model, both presets' tools) runs on `OPENROUTER_API_KEY`, which 
 Energy key: OpenRouter meters it and refuses calls once the owner's Energy is spent. Hermes' own
 `web` tools are disabled so nothing searches outside the key.
 
-## Branch
+## Branches
 
-`main` is what every co-worker runs: `bootstrap.sh` installs and updates from it, and the app
-downloads `bootstrap.sh` and `hindsight-bank.json` from it. A push to `main` reaches each Sprite the
-next time its bootstrap runs.
+Each DesignInstantly environment runs its own branch of this fork, like the app's own branches,
+so a change reaches dev first, then staging, and production last:
 
-**Syncing upstream:** always with git, never GitHub's "Sync fork" button (it ignores `.gitattributes`):
+| Fork branch | Runs on | Set by |
+|---|---|---|
+| `feature/agents` (the current feature branch) | dev co-workers | `COWORKER_HERMES_BRANCH` in the app's dev env |
+| `integration` | staging co-workers | `COWORKER_HERMES_BRANCH` in the app's staging env |
+| `main` | production co-workers | the default when `COWORKER_HERMES_BRANCH` is unset |
+
+The app reads `bootstrap.sh` and `hindsight-bank.json` from its environment's branch and passes it
+to `bootstrap.sh` as `DI_HERMES_BRANCH`, which installs and updates from it. A push to a branch
+reaches that environment's Sprites the next time their bootstrap runs (`update-coworkers.ts`,
+commissioning, a spare refill), and no other environment's.
+
+**Promoting a change:** commit on the feature branch and update dev; merge it into `integration`
+for staging; merge `integration` into `main` for production.
+
+**Syncing upstream:** always with git, never GitHub's "Sync fork" button (it ignores `.gitattributes`).
+Merge into the feature branch first, so upstream changes take the same dev → staging → production path:
 
 ```bash
-git fetch upstream && git checkout -b sync/upstream main && git merge upstream/main
-# resolve the conflicts on our owned files, then open a PR into main
+git fetch upstream && git checkout -b sync/upstream feature/agents && git merge upstream/main
+# resolve the conflicts on our owned files, then open a PR into feature/agents
 ```
 
 ## Running it
@@ -65,7 +79,7 @@ bootstrap.sh               # update in place, reusing the values kept from commi
 ```
 
 The app commissions a brand by claiming a spare and running `bootstrap.sh <input_dir>` on it, which
-skips the install when the spare is on `main`'s current commit.
+skips the install when the spare is on its branch's current commit.
 
 Run a copy outside the checkout (the DesignInstantly app downloads it to `/tmp`): the update step
 rewrites the checkout. A fresh Sprite takes ~6 minutes (Hermes install); updates take seconds when

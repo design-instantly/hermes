@@ -1,5 +1,6 @@
 #!/bin/bash
-# Bring this Sprite's co-worker (Otto) to the main branch of DesignInstantly's Hermes fork.
+# Bring this Sprite's co-worker (Otto) to its environment's branch of DesignInstantly's Hermes fork
+# (DI_HERMES_BRANCH, which the app sets per environment; main by default).
 # Idempotent: commissioning runs it with inputs; re-running it without inputs updates in place.
 #
 # Usage: bootstrap.sh [input_dir]
