@@ -94,8 +94,10 @@ log "start${INPUT_DIR:+ with inputs}$([ "$BASE" = 1 ] && echo ' (--base)')"
 remote_sha=$(git ls-remote "$DI_HERMES_REPO" "refs/heads/$DI_HERMES_BRANCH" | cut -f1)
 [ -n "$remote_sha" ] || { log "branch $DI_HERMES_BRANCH not found on $DI_HERMES_REPO"; exit 1; }
 current_sha=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || echo none)
-if [ "$current_sha" != "$remote_sha" ]; then
-  log "installing $DI_HERMES_BRANCH@${remote_sha:0:10} (was ${current_sha:0:10})"
+# The checkout alone doesn't prove the install: one cut short leaves the checkout at the branch's
+# commit without the hermes command, and every later run would then skip the install and fail.
+if [ "$current_sha" != "$remote_sha" ] || ! command -v hermes >/dev/null; then
+  log "installing $DI_HERMES_BRANCH@${remote_sha:0:10} (was ${current_sha:0:10}$(command -v hermes >/dev/null || echo ', no hermes command'))"
   # Moving to another branch (a new environment, or a renamed branch): drop the checkout's old
   # branch and its stale remote refs first, or git refuses a name that collides with one of them
   # (feature/agents vs feature). The checkout holds no work of its own.
